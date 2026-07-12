@@ -1,49 +1,49 @@
-  {
-    "manifest_version": 3,
-    "name": "PageSnap",
-    "version": "1.0",
-    "description": "Capture window screenshots, full-page screenshots, and record tab content.",
-    "permissions": [
-      "activeTab",
-      "tabCapture",
-      "scripting",
-      "storage",
-      "tabs",
-      "downloads"
-    ],
-    "background": {
-      "service_worker": "background.js",
-      "type": "module"
+{
+  "manifest_version": 3,
+  "name": "PageSnap",
+  "version": "2.0.0",
+  "description": "Capture screenshots, full-page snaps, and record your tab — with annotation and trim editors.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
     },
-    "host_permissions": [
-      "<all_urls>"
-    ],
-    "content_security_policy": {
-      "extension_pages": "script-src 'self'; object-src 'self'",
-      "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self';"
+    "default_title": "PageSnap"
+  },
+  "background": {
+    "service_worker": "background/service_worker.js"
+  },
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "downloads",
+    "scripting",
+    "tabCapture",
+    "offscreen",
+    "favicon"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "commands": {
+    "capture-visible": {
+      "suggested_key": { "default": "Alt+S" },
+      "description": "Capture visible area"
     },
-    "content_scripts": [{
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "all_frames": true,
-      "run_at": "document_end"
-    }],
-    "web_accessible_resources": [{
-      "resources": ["html2canvas.min.js", "content.js"],
-      "matches": ["<all_urls>"]
-    }],
-    "action": {
-      "default_popup": "popup.html",
-      "default_icon": {
-        "16": "images/icon16.png",
-        "64": "images/icon64.png",
-        "128": "images/icon128.png"
-      }
-    },
-    "icons": {
-      "16": "images/icon16.png",
-      "64": "images/icon64.png",
-      "128": "images/icon128.png"
+    "capture-fullpage": {
+      "suggested_key": { "default": "Alt+F" },
+      "description": "Capture full page"
     }
   }
-  
+}

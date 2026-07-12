@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PageSnap</title>
+  <link rel="stylesheet" href="popup.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Header ── -->
+    <header>
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="1" y="1" width="20" height="20" rx="5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="11" cy="11" r="4" fill="currentColor"/>
+          <circle cx="17" cy="5" r="1.5" fill="var(--accent)"/>
+        </svg>
+        <span>PageSnap</span>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="capture">Capture</button>
+        <button class="tab" data-tab="record">Record</button>
+        <button class="tab" data-tab="history">History <span id="history-badge" class="badge hidden">0</span></button>
+      </nav>
+    </header>
+
+    <!-- ── Page Info Bar ── -->
+    <div class="page-info">
+      <span id="page-favicon" class="favicon-wrap">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/></svg>
+      </span>
+      <span id="page-title" class="page-title">Loading…</span>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB: CAPTURE
+    ══════════════════════════════════════════ -->
+    <div id="tab-capture" class="tab-content active">
+
+      <!-- Capture Mode Picker -->
+      <div class="section-label">Capture Mode</div>
+      <div class="mode-grid">
+        <button class="mode-card active" data-mode="visible">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="5" width="24" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="6" y="9" width="16" height="10" rx="1.5" fill="currentColor" opacity=".2"/>
+            <rect x="6" y="9" width="16" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
+          </svg>
+          <span>Visible Area</span>
+          <small>Current viewport</small>
+        </button>
+        <button class="mode-card" data-mode="fullpage">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="2" y="2" width="24" height="24" rx="3" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="8" y1="7" x2="20" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <line x1="8" y1="11" x2="20" y2="11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+            <line x1="8" y1="15" x2="20" y2="15" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".5"/>
+            <line x1="8" y1="19" x2="15" y2="19" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" opacity=".3"/>
+            <path d="M21 22L24 25M22.5 19.5a3 3 0 1 0-6 0 3 3 0 0 0 6 0z" stroke="var(--accent)" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <span>Full Page</span>
+          <small>Entire document</small>
+        </button>
+      </div>
+
+      <!-- Format & Quality -->
+      <div class="options-row">
+        <div class="opt-group">
+          <label>Format</label>
+          <div class="segmented" id="format-picker">
+            <button class="seg active" data-val="png">PNG</button>
+            <button class="seg" data-val="jpg">JPG</button>
+            <button class="seg" data-val="webp">WebP</button>
+          </div>
+        </div>
+        <div class="opt-group">
+          <label>Scale</label>
+          <div class="segmented" id="scale-picker">
+            <button class="seg" data-val="1">1×</button>
+            <button class="seg active" data-val="2">2×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delay -->
+      <div class="opt-group">
+        <label>Capture Delay <span id="delay-val" class="mono">0s</span></label>
+        <input type="range" id="delay-slider" min="0" max="10" value="0" step="1" class="slider" />
+      </div>
+
+      <!-- Capture Button -->
+      <button id="btn-capture" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="3" fill="currentColor"/>
+          <path d="M1 6V4a2 2 0 0 1 2-2h1.5L6 1h4l1.5 1H13a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          <rect x="1" y="6" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.3"/>
+        </svg>
+        Snap It
+      </button>
+
+      <!-- Progress -->
+      <div id="capture-progress" class="progress-wrap hidden">
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+        <span id="progress-label" class="mono">Capturing…</span>
+      </div>
+
+      <!-- Preview -->
+      <div id="preview-wrap" class="preview-wrap hidden">
+        <div class="preview-header">
+          <span class="mono" id="preview-meta">—</span>
+          <div class="preview-actions">
+            <button id="btn-copy" class="icon-btn" title="Copy to clipboard">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4" y="4" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 10V2a1 1 0 0 1 1-1h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            </button>
+            <button id="btn-discard" class="icon-btn danger" title="Dismiss">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <img id="preview-img" alt="Preview" />
+        <div class="preview-footer">
+          <span class="mono muted saved-badge">✓ Saved to downloads</span>
+          <button id="btn-annotate" class="btn-annotate-full">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8.5 1.5l3 3L4 12H1v-3L8.5 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M6.5 3.5l3 3" stroke="currentColor" stroke-width="1.2"/></svg>
+            Open in Editor
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style="opacity:.5"><path d="M2 2h6v6M8 2L2 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div id="toast" class="toast hidden"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB: RECORD
+    ══════════════════════════════════════════ -->
+    <div id="tab-record" class="tab-content">
+
+      <div class="section-label">Recording Settings</div>
+
+      <div class="options-row">
+        <div class="opt-group">
+          <label>Resolution</label>
+          <select id="rec-resolution" class="select">
+            <option value="1920x1080">1920 × 1080</option>
+            <option value="1280x720" selected>1280 × 720</option>
+            <option value="854x480">854 × 480</option>
+            <option value="640x360">640 × 360</option>
+          </select>
+        </div>
+        <div class="opt-group">
+          <label>Frame Rate</label>
+          <div class="segmented" id="fps-picker">
+            <button class="seg" data-val="24">24</button>
+            <button class="seg active" data-val="30">30</button>
+            <button class="seg" data-val="60">60</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="options-row">
+        <div class="opt-group">
+          <label>Format</label>
+          <div class="segmented" id="rec-format-picker">
+            <button class="seg active" data-val="webm">WebM</button>
+            <button class="seg" data-val="mp4">MP4</button>
+          </div>
+        </div>
+        <div class="opt-group">
+          <label>Audio</label>
+          <div class="segmented" id="audio-picker">
+            <button class="seg active" data-val="off">Off</button>
+            <button class="seg" data-val="mic">Mic</button>
+            <button class="seg" data-val="system">Tab</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="opt-group">
+        <label>Countdown <span id="countdown-val" class="mono">3s</span></label>
+        <input type="range" id="countdown-slider" min="0" max="5" value="3" step="1" class="slider" />
+      </div>
+
+      <!-- Recording Status -->
+      <div id="rec-idle" class="rec-state">
+        <button id="btn-record-start" class="btn-record">
+          <span class="rec-dot"></span>
+          Start Recording
+        </button>
+      </div>
+
+      <div id="rec-countdown" class="rec-state hidden">
+        <div class="countdown-circle">
+          <span id="countdown-num">3</span>
+        </div>
+        <p class="mono">Recording starts in…</p>
+      </div>
+
+      <div id="rec-active" class="rec-state hidden">
+        <div class="rec-timer-row">
+          <span class="rec-dot pulsing"></span>
+          <span id="rec-timer" class="rec-timer mono">00:00</span>
+          <span id="rec-size" class="mono muted">0 KB</span>
+        </div>
+        <div class="rec-controls">
+          <button id="btn-rec-pause" class="btn-ctrl">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="3" width="3" height="10" rx="1" fill="currentColor"/><rect x="9" y="3" width="3" height="10" rx="1" fill="currentColor"/></svg>
+            Pause
+          </button>
+          <button id="btn-rec-stop" class="btn-ctrl danger">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor"/></svg>
+            Stop
+          </button>
+        </div>
+      </div>
+
+      <div id="rec-paused" class="rec-state hidden">
+        <div class="rec-timer-row">
+          <span class="rec-dot paused"></span>
+          <span id="rec-timer-paused" class="rec-timer mono">00:00</span>
+          <span class="mono muted">Paused</span>
+        </div>
+        <div class="rec-controls">
+          <button id="btn-rec-resume" class="btn-ctrl">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 3l8 5-8 5V3z" fill="currentColor"/></svg>
+            Resume
+          </button>
+          <button id="btn-rec-stop2" class="btn-ctrl danger">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor"/></svg>
+            Stop
+          </button>
+        </div>
+      </div>
+
+      <div id="rec-done" class="rec-state hidden">
+        <div class="rec-done-info">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="var(--accent)" stroke-width="1.5"/><path d="M10 16l4 4 8-8" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div>
+            <p class="mono" id="rec-final-duration">—</p>
+            <p class="mono muted" id="rec-final-size">—</p>
+          </div>
+        </div>
+        <div class="rec-controls">
+          <button id="btn-rec-save" class="btn-ctrl accent">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Done
+          </button>
+          <button id="btn-rec-trim" class="btn-ctrl">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="3.5" cy="4" r="1.8" stroke="currentColor" stroke-width="1.2"/><circle cx="3.5" cy="10" r="1.8" stroke="currentColor" stroke-width="1.2"/><path d="M5 5l7 6M5 9l7-6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Trim
+          </button>
+          <button id="btn-rec-discard" class="btn-ctrl">New Recording</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         TAB: HISTORY
+    ══════════════════════════════════════════ -->
+    <div id="tab-history" class="tab-content">
+      <div class="history-header">
+        <div class="section-label">Captures</div>
+        <div class="history-actions">
+          <button id="btn-export-all" class="text-btn" title="Export all">Export all</button>
+          <button id="btn-clear-history" class="text-btn danger" title="Clear all">Clear</button>
+        </div>
+      </div>
+
+      <div id="history-empty" class="history-empty hidden">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" opacity=".3">
+          <rect x="4" y="8" width="40" height="32" rx="6" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="24" cy="24" r="7" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="37" cy="13" r="3" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <p>No captures yet</p>
+        <small>Screenshots and recordings will appear here</small>
+      </div>
+
+      <div id="history-list" class="history-list"></div>
+    </div>
+
+    <!-- ── Settings footer ── -->
+    <footer>
+      <button id="btn-settings" class="footer-btn" title="Settings">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M2.93 11.07l1.06-1.06M10.01 3.99l1.06-1.06" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        Settings
+      </button>
+      <span class="version mono">v2.0.0</span>
+    </footer>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span>Settings</span>
+          <button id="close-settings" class="icon-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-row">
+            <div>
+              <span>Auto-copy on capture</span>
+              <small>Copy to clipboard automatically</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="setting-autocopy" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <span>Show preview</span>
+              <small>Preview before saving</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="setting-preview" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <span>Filename template</span>
+              <small>{type}, {date}, {time}</small>
+            </div>
+            <input type="text" class="text-input" value="pagesnap_{type}_{date}_{time}" id="setting-filename" />
+          </div>
+          <div class="setting-row">
+            <div>
+              <span>Theme</span>
+            </div>
+            <div class="segmented" id="theme-picker">
+              <button class="seg active" data-val="dark">Dark</button>
+              <button class="seg" data-val="light">Light</button>
+            </div>
+          </div>
+          <div class="shortcuts-info">
+            <p class="mono muted">Keyboard Shortcuts</p>
+            <div class="shortcut-row"><kbd>Alt+S</kbd><span>Capture visible</span></div>
+            <div class="shortcut-row"><kbd>Alt+F</kbd><span>Capture full page</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="../lib/db.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
