@@ -28,6 +28,10 @@ const state = {
   showPreview: true,
   filenameTemplate: 'pagesnap_{type}_{date}_{time}',
   theme: 'dark',
+
+  // History view
+  historyFilter: 'all',   // all | image | video
+  historySort: 'newest',  // newest | oldest
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -44,6 +48,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await refreshHistory();
   await syncRecordingState();
   bindAll();
+  await initAiSearch();
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -187,6 +192,12 @@ function bindAll() {
   // History
   $('#btn-clear-history').addEventListener('click', clearHistory);
   $('#btn-export-all').addEventListener('click', exportAll);
+  bindSegmented('#history-filter', (v) => { state.historyFilter = v; refreshHistory(); });
+  $('#history-sort').addEventListener('click', () => {
+    state.historySort = state.historySort === 'newest' ? 'oldest' : 'newest';
+    $('#history-sort-label').textContent = state.historySort === 'newest' ? 'Newest' : 'Oldest';
+    refreshHistory();
+  });
 
   // Settings modal
   $('#btn-settings').addEventListener('click', () => $('#settings-modal').classList.remove('hidden'));
@@ -198,6 +209,265 @@ function bindAll() {
   $('#setting-preview').addEventListener('change',  (e) => { state.showPreview = e.target.checked; saveAppSettings(); });
   $('#setting-filename').addEventListener('change', (e) => { state.filenameTemplate = e.target.value; saveAppSettings(); });
   bindSegmented('#theme-picker', (v) => { state.theme = v; applyTheme(v); saveAppSettings(); });
+
+  // Search
+  $('#search-input').addEventListener('input', onSearchInput);
+  $('#search-clear').addEventListener('click', () => { $('#search-input').value = ''; onSearchInput(); $('#search-input').focus(); });
+  $('#btn-enable-ai').addEventListener('click', downloadModel);
+
+  // AI settings
+  $('#btn-ai-model').addEventListener('click', onModelButton);
+  $('#btn-reindex').addEventListener('click', reindexAll);
+  $('#setting-indexing').addEventListener('change', async (e) => {
+    await sendBg({ action: 'AI_SET_STATE', patch: { indexingEnabled: e.target.checked } });
+    aiState.indexingEnabled = e.target.checked;
+  });
+
+  // First-run modal
+  $('#firstrun-download').addEventListener('click', () => downloadModel(true));
+  $('#firstrun-later').addEventListener('click', dismissFirstRun);
+  $('#firstrun-skip').addEventListener('click', dismissFirstRun);
+
+  // Progress broadcasts from the indexer
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.action === 'AI_PROGRESS') onAiProgress(msg);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// AI SEMANTIC SEARCH
+// ════════════════════════════════════════════════════════════════════════════
+
+let aiState = { modelState: 'absent', indexingEnabled: true, promptedFirstRun: false };
+let searchDebounce = null;
+let searchSeq = 0;
+
+async function initAiSearch() {
+  try {
+    const res = await sendBg({ action: 'AI_STATE' });
+    if (res.success) aiState = res.data;
+  } catch (_) {}
+  applyAiStateToUI();
+  if (!aiState.promptedFirstRun) $('#firstrun-modal').classList.remove('hidden');
+}
+
+function applyAiStateToUI() {
+  const ready = aiState.modelState === 'ready';
+  const downloading = aiState.modelState === 'downloading';
+
+  $('#search-enable').classList.toggle('hidden', ready);
+  $('#setting-indexing').checked = aiState.indexingEnabled;
+
+  const statusEl = $('#ai-model-status');
+  const btn = $('#btn-ai-model');
+  if (ready)            { statusEl.textContent = 'Downloaded · ready'; btn.textContent = 'Delete'; btn.classList.add('danger'); }
+  else if (downloading) { statusEl.textContent = 'Downloading…';       btn.textContent = 'Download'; btn.classList.remove('danger'); }
+  else                  { statusEl.textContent = 'Not downloaded (~40MB)'; btn.textContent = 'Download'; btn.classList.remove('danger'); }
+
+  $('#btn-reindex').disabled = !ready;
+  updateIndexStatus();
+}
+
+async function updateIndexStatus() {
+  const el = $('#ai-index-status');
+  if (aiState.modelState !== 'ready') { el.textContent = 'Enable the model first'; return; }
+  try {
+    const all = await PSDB.embAll();
+    const { history = [] } = await chrome.storage.local.get('history');
+    el.textContent = `${all.length} of ${history.length} captures indexed`;
+  } catch (_) { el.textContent = '—'; }
+}
+
+async function downloadModel(fromFirstRun = false) {
+  aiState.modelState = 'downloading';
+  applyAiStateToUI();
+  if (fromFirstRun) {
+    $('#firstrun-download').disabled = true;
+    $('#firstrun-later').classList.add('hidden');
+    $('#firstrun-progress').classList.remove('hidden');
+  } else {
+    $('#ai-progress').classList.remove('hidden');
+  }
+
+  const res = await sendBg({ action: 'AI_MODEL_DOWNLOAD' });
+  if (res.success) {
+    aiState.modelState = 'ready';
+    aiState.promptedFirstRun = true;
+    await sendBg({ action: 'AI_SET_STATE', patch: { promptedFirstRun: true } });
+    applyAiStateToUI();
+    $('#ai-progress').classList.add('hidden');
+    dismissFirstRun();
+    showToast('✓ AI search ready — indexing your captures…');
+    reindexAll(); // backfill existing history
+  } else {
+    aiState.modelState = 'absent';
+    applyAiStateToUI();
+    $('#ai-progress').classList.add('hidden');
+    $('#firstrun-progress').classList.add('hidden');
+    $('#firstrun-download').disabled = false;
+    $('#firstrun-later').classList.remove('hidden');
+    showToast('⚠ Download failed: ' + (res.error || 'unknown'));
+  }
+}
+
+async function onModelButton() {
+  if (aiState.modelState === 'ready') {
+    if (!confirm('Delete the AI model and clear the search index? You can re-download it later.')) return;
+    await sendBg({ action: 'AI_MODEL_DELETE' });
+    aiState.modelState = 'absent';
+    applyAiStateToUI();
+    showToast('Model deleted');
+  } else if (aiState.modelState !== 'downloading') {
+    downloadModel(false);
+  }
+}
+
+async function reindexAll() {
+  if (aiState.modelState !== 'ready') return;
+  $('#ai-progress').classList.remove('hidden');
+  $('#ai-progress-label').textContent = 'Indexing…';
+  const res = await sendBg({ action: 'AI_INDEX_ALL' });
+  $('#ai-progress').classList.add('hidden');
+  if (res?.success) showToast(`✓ Indexed ${res.indexed} capture${res.indexed === 1 ? '' : 's'}`);
+  updateIndexStatus();
+}
+
+function onAiProgress(msg) {
+  if (msg.phase === 'download') {
+    const pct = msg.pct || 0;
+    $('#ai-progress-fill').style.width = pct + '%';
+    $('#ai-progress-label').textContent = `Downloading model… ${pct}%`;
+    $('#firstrun-progress-fill').style.width = pct + '%';
+    $('#firstrun-progress-label').textContent = `Downloading model… ${pct}%`;
+  } else if (msg.phase === 'index') {
+    const pct = msg.total ? Math.round((msg.done / msg.total) * 100) : 100;
+    $('#ai-progress-fill').style.width = pct + '%';
+    $('#ai-progress-label').textContent = `Indexing ${msg.done}/${msg.total}…`;
+  }
+}
+
+async function dismissFirstRun() {
+  $('#firstrun-modal').classList.add('hidden');
+  if (!aiState.promptedFirstRun) {
+    aiState.promptedFirstRun = true;
+    await sendBg({ action: 'AI_SET_STATE', patch: { promptedFirstRun: true } });
+  }
+}
+
+function onSearchInput() {
+  const q = $('#search-input').value.trim();
+  $('#search-clear').classList.toggle('hidden', !q);
+  clearTimeout(searchDebounce);
+  if (!q) { $('#search-results').innerHTML = ''; $('#search-status').textContent = ''; return; }
+  searchDebounce = setTimeout(() => runSearch(q), 250);
+}
+
+async function runSearch(query) {
+  const seq = ++searchSeq;
+  const { history = [] } = await chrome.storage.local.get('history');
+
+  // Keyword matches on title/URL always work, model or not
+  const ql = query.toLowerCase();
+  const keyword = new Map();
+  history.forEach(h => {
+    if ((h.title || '').toLowerCase().includes(ql) || (h.url || '').toLowerCase().includes(ql)) {
+      keyword.set(h.id, 0.5); // fixed boost, ranked below strong semantic hits
+    }
+  });
+
+  let semantic = new Map();
+  if (aiState.modelState === 'ready') {
+    $('#search-status').textContent = 'Searching…';
+    try {
+      const res = await sendBg({ action: 'AI_SEARCH', query });
+      if (seq !== searchSeq) return; // superseded by a newer query
+      if (res.success) res.results.forEach(r => semantic.set(r.id, r));
+    } catch (_) {}
+  }
+
+  // Merge: score = max(semantic, keyword-boost). Keep the semantic frame time.
+  const merged = [];
+  const ids = new Set([...semantic.keys(), ...keyword.keys()]);
+  for (const id of ids) {
+    const entry = history.find(h => h.id === id);
+    if (!entry) continue;
+    const sem = semantic.get(id);
+    const score = Math.max(sem?.score ?? -1, keyword.get(id) ?? -1);
+    merged.push({ entry, score, t: sem?.t ?? null, semantic: !!sem });
+  }
+  merged.sort((a, b) => b.score - a.score);
+
+  // Show semantic hits above a relevance floor, plus all keyword hits
+  const shown = merged.filter(m => m.semantic ? m.score >= 0.18 : true).slice(0, 30);
+
+  if (seq !== searchSeq) return;
+  renderSearchResults(shown, query);
+}
+
+function renderSearchResults(results, query) {
+  const status = $('#search-status');
+  const list = $('#search-results');
+
+  if (!results.length) {
+    status.textContent = aiState.modelState === 'ready'
+      ? 'No matches.'
+      : 'No title matches. Enable AI search to search inside captures.';
+    list.innerHTML = '';
+    return;
+  }
+
+  status.textContent = `${results.length} result${results.length === 1 ? '' : 's'}`;
+  list.innerHTML = results.map(r => {
+    const e = r.entry;
+    const isVideo = e.type === 'video';
+    const chip = e.type === 'fullpage' ? 'Full Page' : isVideo ? '▶ Video' : 'Snap';
+    const pct = r.semantic ? `<span class="result-score mono">${Math.round(r.score * 100)}%</span>` : '';
+    const tstamp = isVideo && r.t != null ? `<span class="mono">@ ${formatDuration(r.t * 1000)}</span>` : '';
+    const thumb = isVideo
+      ? `<div class="history-thumb-video"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 4l8 4-8 4V4z" fill="currentColor"/></svg></div>`
+      : `<div class="history-thumb history-thumb-placeholder" data-entry-id="${e.id}"></div>`;
+    return `
+      <div class="history-item" data-id="${e.id}" data-t="${r.t ?? ''}" title="Open">
+        ${thumb}
+        <div class="history-info">
+          <div class="title">${escapeHtml(e.title || 'Untitled')}</div>
+          <div class="meta">
+            <span class="history-chip ${e.type === 'fullpage' ? 'full' : isVideo ? 'video' : ''}">${chip}</span>
+            ${tstamp} ${pct}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Lazy thumbnails from IndexedDB
+  list.querySelectorAll('.history-thumb-placeholder').forEach(async ph => {
+    const dataUrl = await PSDB.get(ph.dataset.entryId).catch(() => null);
+    if (typeof dataUrl === 'string') {
+      const img = document.createElement('img');
+      img.className = 'history-thumb'; img.src = dataUrl; img.alt = '';
+      ph.replaceWith(img);
+    }
+  });
+
+  // Click → open
+  list.querySelectorAll('.history-item').forEach(item => {
+    item.addEventListener('click', async () => {
+      const id = item.dataset.id;
+      const entry = results.find(r => r.entry.id === id)?.entry;
+      if (!entry) return;
+      if (entry.type === 'video') {
+        const t = item.dataset.t ? parseFloat(item.dataset.t) : undefined;
+        openEditor(id, t);
+        return;
+      }
+      const dataUrl = await PSDB.get(id).catch(() => null);
+      if (typeof dataUrl !== 'string') { showToast('⚠ Image data missing'); return; }
+      entry.dataUrl = dataUrl;
+      switchTab('capture');
+      state.currentCapture = entry;
+      showPreview(entry);
+    });
+  });
 }
 
 function switchTab(name) {
@@ -473,8 +743,10 @@ function setRecState(status) {
   );
 }
 
-function openEditor(entryId) {
-  chrome.tabs.create({ url: chrome.runtime.getURL('editor/editor.html') + '?id=' + encodeURIComponent(entryId) });
+function openEditor(entryId, t) {
+  let url = chrome.runtime.getURL('editor/editor.html') + '?id=' + encodeURIComponent(entryId);
+  if (t != null && isFinite(t)) url += '&t=' + encodeURIComponent(t);
+  chrome.tabs.create({ url });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -482,21 +754,37 @@ function openEditor(entryId) {
 // ════════════════════════════════════════════════════════════════════════════
 
 async function refreshHistory() {
-  const history = await getHistory();
+  const full  = await getHistory();
   const badge = $('#history-badge');
   const list  = $('#history-list');
   const empty = $('#history-empty');
+  const toolbar = $('#history-toolbar');
 
-  badge.textContent = history.length;
-  badge.classList.toggle('hidden', history.length === 0);
+  // Badge reflects the true total, regardless of the active filter
+  badge.textContent = full.length;
+  badge.classList.toggle('hidden', full.length === 0);
+  toolbar.classList.toggle('hidden', full.length === 0);
 
-  if (!history.length) {
+  if (!full.length) {
     empty.classList.remove('hidden');
     list.innerHTML = '';
     return;
   }
-
   empty.classList.add('hidden');
+
+  // Filter (screenshots = visible + fullpage) then sort by date
+  const history = full
+    .filter(h => state.historyFilter === 'all'
+      || (state.historyFilter === 'video' ? h.type === 'video' : h.type !== 'video'))
+    .sort((a, b) => state.historySort === 'newest'
+      ? b.timestamp - a.timestamp
+      : a.timestamp - b.timestamp);
+
+  if (!history.length) {
+    list.innerHTML = `<div class="history-none mono muted">No ${state.historyFilter === 'video' ? 'recordings' : 'screenshots'} yet</div>`;
+    return;
+  }
+
   list.innerHTML = history.map(buildHistoryItem).join('');
 
   list.querySelectorAll('.hist-download').forEach(btn => {

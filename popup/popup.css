@@ -65,10 +65,12 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
 
 /* ── Header ── */
+/* Logo on its own line, then a full-width tab bar — four tabs don't fit
+   beside the wordmark at 380px. */
 header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   padding: 14px 16px 0;
   gap: 12px;
 }
@@ -89,6 +91,7 @@ header {
 .tabs {
   display: flex;
   gap: 2px;
+  width: 100%;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -96,19 +99,21 @@ header {
 }
 
 .tab {
+  flex: 1;
   background: none;
   border: none;
   color: var(--text-muted);
   font-family: var(--font);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 6px 6px;
   border-radius: 4px;
   cursor: pointer;
   transition: var(--transition);
   white-space: nowrap;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
 }
 
@@ -1020,3 +1025,107 @@ kbd {
   justify-content: center;
   color: var(--text-muted);
 }
+
+/* ══ History toolbar ══ */
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.history-toolbar .segmented { flex: 1; }
+.history-toolbar .seg { flex: 1; font-size: 10.5px; padding: 5px 6px; }
+
+.sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition);
+}
+.sort-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.history-none {
+  text-align: center;
+  padding: 24px 0;
+  font-size: 11px;
+}
+
+/* ══ Search tab ══ */
+#tab-search { gap: 12px; }
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  color: var(--text-muted);
+}
+.search-box:focus-within { border-color: var(--accent); color: var(--text); }
+.search-box input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+}
+.search-box input::placeholder { color: var(--text-muted); }
+
+.search-enable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 18px;
+}
+.search-enable p { font-size: 12.5px; color: var(--text); max-width: 280px; }
+.search-enable em { color: var(--accent); font-style: normal; font-weight: 700; }
+.search-enable .btn-primary { width: auto; padding: 9px 18px; }
+.search-enable small { font-size: 10px; }
+
+.search-status { min-height: 14px; font-size: 11px; padding: 0 2px; }
+
+.search-results { display: flex; flex-direction: column; gap: 6px; }
+
+.result-score {
+  font-size: 10px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ══ Settings: AI section ══ */
+.setting-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  margin: 14px 0 2px;
+}
+
+/* ══ First-run modal ══ */
+.firstrun-copy { font-size: 13px; line-height: 1.55; margin-bottom: 10px; }
+.firstrun-copy em { color: var(--accent); font-style: normal; font-weight: 700; }
+.firstrun-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.firstrun-actions .btn-primary { width: 100%; }
+.firstrun-actions .text-btn { align-self: center; }

@@ -24,6 +24,7 @@
       <nav class="tabs">
         <button class="tab active" data-tab="capture">Capture</button>
         <button class="tab" data-tab="record">Record</button>
+        <button class="tab" data-tab="search">Search</button>
         <button class="tab" data-tab="history">History <span id="history-badge" class="badge hidden">0</span></button>
       </nav>
     </header>
@@ -261,6 +262,29 @@
     </div>
 
     <!-- ══════════════════════════════════════════
+         TAB: SEARCH
+    ══════════════════════════════════════════ -->
+    <div id="tab-search" class="tab-content">
+      <div id="search-enable" class="search-enable hidden">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" opacity=".7"><circle cx="10.5" cy="10.5" r="7" stroke="var(--accent)" stroke-width="1.6"/><path d="M15.5 15.5L21 21" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.5" cy="10.5" r="2.5" fill="var(--accent)" opacity=".4"/></svg>
+        <p>AI search finds captures by what they <em>look like</em> or the text in them — on-device, private.</p>
+        <button id="btn-enable-ai" class="btn-primary">Enable AI Search (~40MB)</button>
+        <small class="muted mono">Keyword search on titles works without it.</small>
+      </div>
+
+      <div class="search-box">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input type="text" id="search-input" placeholder="Search your captures…" autocomplete="off" />
+        <button id="search-clear" class="icon-btn hidden" title="Clear">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div id="search-status" class="search-status mono muted"></div>
+      <div id="search-results" class="search-results"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════
          TAB: HISTORY
     ══════════════════════════════════════════ -->
     <div id="tab-history" class="tab-content">
@@ -270,6 +294,18 @@
           <button id="btn-export-all" class="text-btn" title="Export all">Export all</button>
           <button id="btn-clear-history" class="text-btn danger" title="Clear all">Clear</button>
         </div>
+      </div>
+
+      <div id="history-toolbar" class="history-toolbar hidden">
+        <div class="segmented" id="history-filter">
+          <button class="seg active" data-val="all">All</button>
+          <button class="seg" data-val="image">Screenshots</button>
+          <button class="seg" data-val="video">Videos</button>
+        </div>
+        <button id="history-sort" class="sort-btn" title="Toggle sort order">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 2v8M3 10L1.5 8.5M3 10l1.5-1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 3h5M6 6h3.5M6 9h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <span id="history-sort-label">Newest</span>
+        </button>
       </div>
 
       <div id="history-empty" class="history-empty hidden">
@@ -288,13 +324,13 @@
     <!-- ── Settings footer ── -->
     <footer>
       <button id="btn-settings" class="footer-btn" title="Settings">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/>
-          <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M2.93 11.07l1.06-1.06M10.01 3.99l1.06-1.06" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
         Settings
       </button>
-      <span class="version mono">v2.0.0</span>
+      <span class="version mono">v2.1.0</span>
     </footer>
 
     <!-- Settings Modal -->
@@ -343,10 +379,64 @@
               <button class="seg" data-val="light">Light</button>
             </div>
           </div>
+          <div class="setting-group-label">AI Search</div>
+          <div class="setting-row">
+            <div>
+              <span>Model</span>
+              <small id="ai-model-status">Not downloaded</small>
+            </div>
+            <button id="btn-ai-model" class="text-btn">Download</button>
+          </div>
+          <div class="setting-row">
+            <div>
+              <span>Auto-index new captures</span>
+              <small>Embed captures as they're saved</small>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="setting-indexing" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div>
+              <span>Search index</span>
+              <small id="ai-index-status">—</small>
+            </div>
+            <button id="btn-reindex" class="text-btn">Reindex all</button>
+          </div>
+          <div id="ai-progress" class="progress-wrap hidden">
+            <div class="progress-bar"><div id="ai-progress-fill" class="progress-fill"></div></div>
+            <span id="ai-progress-label" class="mono">Working…</span>
+          </div>
+
           <div class="shortcuts-info">
             <p class="mono muted">Keyboard Shortcuts</p>
             <div class="shortcut-row"><kbd>Alt+S</kbd><span>Capture visible</span></div>
             <div class="shortcut-row"><kbd>Alt+F</kbd><span>Capture full page</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- First-run AI modal -->
+    <div id="firstrun-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span>✨ AI Search</span>
+          <button id="firstrun-skip" class="icon-btn">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="firstrun-copy">PageSnap can search <em>inside</em> your screenshots and recordings — by what they look like or the text on screen — using a small AI model that runs entirely on your device.</p>
+          <p class="firstrun-copy muted">Download it once (~40MB). Nothing you capture ever leaves your computer.</p>
+          <div class="firstrun-actions">
+            <button id="firstrun-download" class="btn-primary">Download model (~40MB)</button>
+            <button id="firstrun-later" class="text-btn">Maybe later</button>
+          </div>
+          <div id="firstrun-progress" class="progress-wrap hidden">
+            <div class="progress-bar"><div id="firstrun-progress-fill" class="progress-fill"></div></div>
+            <span id="firstrun-progress-label" class="mono">Downloading…</span>
           </div>
         </div>
       </div>

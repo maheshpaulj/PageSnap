@@ -50,6 +50,13 @@ window.addEventListener('load', async () => {
 
   S.start = 0;
   S.end = S.duration;
+
+  // Deep-link: ?t=<seconds> (from a video search hit) seeks to that moment
+  const tParam = parseFloat(new URLSearchParams(location.search).get('t'));
+  if (isFinite(tParam) && tParam > 0 && tParam < S.duration) {
+    try { await seekTo(video, tParam); } catch (_) {}
+  }
+
   document.getElementById('video-title').textContent =
     `${S.entry.title || 'Screen Recording'} · ${fmt(S.duration)} · ${fmtBytes(blob.size)}`;
 

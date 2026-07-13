@@ -121,6 +121,51 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
         }
 
+        // ── AI semantic search ──────────────────────────────────────────────
+        case 'AI_STATE': {
+          sendResponse({ success: true, data: await getAiState() });
+          break;
+        }
+        case 'AI_SET_STATE': {
+          sendResponse({ success: true, data: await setAiState(message.patch || {}) });
+          break;
+        }
+        case 'AI_MODEL_DOWNLOAD': {
+          await ensureIndexer();
+          await setAiState({ modelState: 'downloading' });
+          const r = await sendToIndexer('LOAD_MODEL');
+          if (r?.success) {
+            await setAiState({ modelState: 'ready' });
+            sendResponse({ success: true, device: r.device });
+          } else {
+            await setAiState({ modelState: 'absent' });
+            sendResponse({ success: false, error: r?.error || 'Model load failed' });
+          }
+          break;
+        }
+        case 'AI_MODEL_DELETE': {
+          await ensureIndexer().catch(() => {});
+          await sendToIndexer('DELETE_MODEL').catch(() => {});
+          await setAiState({ modelState: 'absent' });
+          sendResponse({ success: true });
+          break;
+        }
+        case 'AI_INDEX_ALL': {
+          const st = await getAiState();
+          if (st.modelState !== 'ready') { sendResponse({ success: false, error: 'Model not downloaded' }); break; }
+          await ensureIndexer();
+          const entries = (await getHistory()).map(h => ({ id: h.id, type: h.type, durationMs: h.durationMs }));
+          sendResponse(await sendToIndexer('INDEX_ALL', { entries }));
+          break;
+        }
+        case 'AI_SEARCH': {
+          const st = await getAiState();
+          if (st.modelState !== 'ready') { sendResponse({ success: false, error: 'Model not downloaded' }); break; }
+          await ensureIndexer();
+          sendResponse(await sendToIndexer('SEARCH', { query: message.query }));
+          break;
+        }
+
         // ── Tab info ───────────────────────────────────────────────────────
         case 'GET_TAB_INFO': {
           const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -616,8 +661,8 @@ async function ensureOffscreen() {
   if (!has) {
     await chrome.offscreen.createDocument({
       url: 'offscreen/offscreen.html',
-      reasons: ['USER_MEDIA'],
-      justification: 'PageSnap: MediaRecorder for tab recording',
+      reasons: ['USER_MEDIA', 'BLOBS'],
+      justification: 'PageSnap: MediaRecorder for tab recording and CLIP indexing for search',
     });
   }
   // Ping until the offscreen doc's message listener is ready (up to 2s)
@@ -637,6 +682,50 @@ function sendToOffscreen(action, extra = {}) {
       else resolve(res);
     });
   });
+}
+
+// ── AI semantic search plumbing ───────────────────────────────────────────────
+function sendToIndexer(action, extra = {}) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ target: 'indexer', action, ...extra }, (res) => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(res);
+    });
+  });
+}
+
+async function ensureIndexer() {
+  await ensureOffscreen();
+  // The indexer is an ES module — wait for its listener to come online
+  for (let i = 0; i < 40; i++) {
+    try { const p = await sendToIndexer('PING'); if (p?.ok) return; } catch (_) {}
+    await sleep(100);
+  }
+  throw new Error('Search indexer not ready');
+}
+
+async function getAiState() {
+  const { aiSearch = {} } = await chrome.storage.local.get('aiSearch');
+  return { modelState: 'absent', indexingEnabled: true, promptedFirstRun: false, ...aiSearch };
+}
+
+async function setAiState(patch) {
+  const next = { ...(await getAiState()), ...patch };
+  await chrome.storage.local.set({ aiSearch: next });
+  return next;
+}
+
+// Auto-index a freshly saved capture (fire-and-forget; no-op unless the model
+// is downloaded and indexing is enabled).
+async function queueIndex(id, type, durationMs) {
+  try {
+    const st = await getAiState();
+    if (!st.indexingEnabled || st.modelState !== 'ready') return;
+    await ensureIndexer();
+    await sendToIndexer('INDEX_ENTRY', { entry: { id, type, durationMs } });
+  } catch (e) {
+    console.warn('[PageSnap] auto-index failed:', e.message);
+  }
 }
 
 // ── Overlay ───────────────────────────────────────────────────────────────────
@@ -712,6 +801,7 @@ async function saveToHistory(entry, skipAutoDownload = false) {
   if (!skipAutoDownload && entry.dataUrl) {
     autoDownload(entry); // fire and forget
   }
+  queueIndex(entry.id, entry.type, entry.durationMs); // fire and forget
   return entry; // return with dataUrl still attached for immediate popup use
 }
 
