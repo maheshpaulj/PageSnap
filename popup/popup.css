@@ -86,7 +86,7 @@ header {
   flex-shrink: 0;
 }
 
-.logo svg { color: var(--accent); }
+.logo img { border-radius: 5px; }
 
 .tabs {
   display: flex;

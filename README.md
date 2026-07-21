@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icons/banner.png" alt="PageSnap — one extension to capture everything" width="100%" />
+</p>
+
 # PageSnap
 
 Screenshots, full-page snaps, and tab recording for Chrome — with a built-in annotation editor and a video trim editor. No external services, no telemetry; everything stays on your machine.
@@ -12,23 +16,21 @@ Screenshots, full-page snaps, and tab recording for Chrome — with a built-in a
 - **Annotation editor** — pen, line, arrow, rectangle, ellipse, text, highlighter, pixelate/redact, and eraser tools, with zoom/pan and undo/redo. Annotations live on their own canvas layer so the eraser can never damage the underlying screenshot.
 - **Trim editor** — set in/out points on a timeline, preview the selection, then export just that range. Re-encodes in real time via `captureStream()` + `MediaRecorder`, so audio is preserved with no external dependencies.
 - **AI search** — find captures by what they *look like* ("the dark dashboard with a chart"), not just their title. A small CLIP model (~40MB, quantized) runs entirely on-device via a vendored [Transformers.js](https://github.com/huggingface/transformers.js); it embeds each screenshot — and sampled frames of each recording — so a video hit deep-links straight to the matching moment. Opt-in: the model is only downloaded if you choose to enable it, and keyword search on titles works without it.
-- **History** — the last 50 captures, with thumbnails, one-click re-download, and per-item delete. Metadata lives in `chrome.storage.local`; the actual image/video data (and search embeddings) live in IndexedDB, so they survive service-worker restarts and never hit the 10MB storage quota.
+- **History** — the last 50 captures, with thumbnails, one-click re-download, and per-item delete. Filter by all/screenshots/videos and sort newest/oldest. Metadata lives in `chrome.storage.local`; the actual image/video data (and search embeddings) live in IndexedDB, so they survive service-worker restarts and never hit the 10MB storage quota.
 - **Keyboard shortcuts** — `Alt+S` capture visible area, `Alt+F` capture full page.
 
 > **Privacy note:** enabling AI search downloads the CLIP model weights once from the Hugging Face CDN, after which everything (indexing and searching) happens locally — your captures are never uploaded. The model can be deleted anytime from Settings, and auto-indexing can be turned off.
 
 ## Install
 
-### From source (recommended for now)
-
-1. Clone or download this repository.
+1. Grab the latest zip from **[Releases](https://github.com/CityIsBetter/PageSnap/releases/latest)** and extract it to a folder.
 2. Open `chrome://extensions` in Chrome (or any Chromium-based browser).
 3. Enable **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select the repository folder — the one containing `manifest.json`.
+4. Click **Load unpacked** and select the extracted folder — the one containing `manifest.json`.
 
-### Packaged zip
+Building from source instead? Clone the repo and load it unpacked the same way — no build step required.
 
-To produce a distributable zip (e.g. for the Chrome Web Store dashboard):
+### Packaging a release zip
 
 ```bash
 zip -r pagesnap.zip manifest.json background content offscreen popup annotate editor lib icons

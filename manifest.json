@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PageSnap",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Capture screenshots, full-page snaps, and record your tab — with annotation, trimming, and on-device AI search.",
   "icons": {
     "16": "icons/icon16.png",
